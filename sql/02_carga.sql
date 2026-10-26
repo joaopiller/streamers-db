@@ -178,6 +178,26 @@ FROM (
 ) AS s
 ON CONFLICT DO NOTHING;
 
+INSERT INTO Patrocinio (nro_empresa, id_canal, valor)
+SELECT 1 + floor(random() * e.ne)::int,
+       1 + floor(c.nc * power(random(), 2))::int,
+       round(power(10, 2.7 + random() * 2.6)::numeric, 2)
+FROM generate_series(1, 3400 + floor(random() * 300)::int),
+     (SELECT count(*) AS ne FROM Empresa) AS e, (SELECT count(*) AS nc FROM Canal) AS c
+ON CONFLICT DO NOTHING;
+
+-- o dono não é membro do próprio canal; níveis baratos são mais comuns
+INSERT INTO Inscricao (id_canal, id_membro, nivel)
+SELECT s.id_canal, s.id_membro, 1 + floor(5 * power(random(), 2.5))::int
+FROM (
+    SELECT 1 + floor(c.nc * power(random(), 2))::int AS id_canal,
+           1 + floor(random() * u.nu)::int AS id_membro
+    FROM generate_series(1, 10600 + floor(random() * 300)::int),
+         (SELECT count(*) AS nc FROM Canal) AS c, (SELECT count(*) AS nu FROM Usuario) AS u
+) AS s
+JOIN Canal c ON c.id_canal = s.id_canal AND c.id_streamer <> s.id_membro
+ON CONFLICT DO NOTHING;
+
 COMMIT;
 
 ANALYZE;
