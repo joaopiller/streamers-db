@@ -5,6 +5,9 @@ DROP TRIGGER IF EXISTS comentario_bi ON Comentario;
 DROP TRIGGER IF EXISTS comentario_bu ON Comentario;
 DROP TRIGGER IF EXISTS doacao_seq_bi ON Doacao;
 DROP TRIGGER IF EXISTS mecplat_seq_bi ON MecanismoPlat;
+DROP TRIGGER IF EXISTS video_qtd_ai ON Video;
+DROP TRIGGER IF EXISTS video_qtd_ad ON Video;
+DROP TRIGGER IF EXISTS video_qtd_au ON Video;
 
 -- Comentario.seq: sequencial por (vídeo, usuário)
 CREATE OR REPLACE FUNCTION trg_comentario_insere() RETURNS trigger AS $$
@@ -98,3 +101,37 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER mecplat_seq_bi
 BEFORE INSERT ON MecanismoPlat
 FOR EACH ROW EXECUTE PROCEDURE trg_mecplat_seq();
+
+-- Canal.qtd_videos acompanha INSERT, DELETE e troca de canal do vídeo
+CREATE OR REPLACE FUNCTION trg_video_insere() RETURNS trigger AS $$
+BEGIN
+    UPDATE Canal SET qtd_videos = qtd_videos + 1 WHERE id_canal = NEW.id_canal;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION trg_video_remove() RETURNS trigger AS $$
+BEGIN
+    UPDATE Canal SET qtd_videos = qtd_videos - 1 WHERE id_canal = OLD.id_canal;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION trg_video_muda_canal() RETURNS trigger AS $$
+BEGIN
+    IF NEW.id_canal <> OLD.id_canal THEN
+        UPDATE Canal SET qtd_videos = qtd_videos - 1 WHERE id_canal = OLD.id_canal;
+        UPDATE Canal SET qtd_videos = qtd_videos + 1 WHERE id_canal = NEW.id_canal;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER video_qtd_ai AFTER INSERT ON Video
+FOR EACH ROW EXECUTE PROCEDURE trg_video_insere();
+
+CREATE TRIGGER video_qtd_ad AFTER DELETE ON Video
+FOR EACH ROW EXECUTE PROCEDURE trg_video_remove();
+
+CREATE TRIGGER video_qtd_au AFTER UPDATE OF id_canal ON Video
+FOR EACH ROW EXECUTE PROCEDURE trg_video_muda_canal();
