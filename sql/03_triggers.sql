@@ -13,6 +13,7 @@ DROP TRIGGER IF EXISTS bitcoin_subtipo_bi ON BitCoin;
 DROP TRIGGER IF EXISTS paypal_subtipo_bi ON PayPal;
 DROP TRIGGER IF EXISTS cartaocredito_subtipo_bi ON CartaoCredito;
 DROP TRIGGER IF EXISTS mecanismoplat_subtipo_bi ON MecanismoPlat;
+DROP TRIGGER IF EXISTS participa_dono_bi ON Participa;
 
 -- Comentario.seq: sequencial por (vídeo, usuário)
 CREATE OR REPLACE FUNCTION trg_comentario_insere() RETURNS trigger AS $$
@@ -188,3 +189,22 @@ CREATE CONSTRAINT TRIGGER doacao_total_ai
 AFTER INSERT ON Doacao
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE PROCEDURE trg_doacao_total();
+
+-- o dono do canal já participa do vídeo; gravá-lo em Participa seria redundância
+CREATE OR REPLACE FUNCTION trg_participa_dono() RETURNS trigger AS $$
+DECLARE
+    v_dono Canal.id_streamer%TYPE;
+BEGIN
+    SELECT c.id_streamer INTO v_dono
+      FROM Video v JOIN Canal c ON c.id_canal = v.id_canal
+     WHERE v.id_video = NEW.id_video;
+    IF v_dono = NEW.id_streamer THEN
+        RAISE EXCEPTION 'Streamer % é dono do canal do vídeo %', NEW.id_streamer, NEW.id_video;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER participa_dono_bi
+BEFORE INSERT OR UPDATE ON Participa
+FOR EACH ROW EXECUTE PROCEDURE trg_participa_dono();
