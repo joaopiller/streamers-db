@@ -208,3 +208,24 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER participa_dono_bi
 BEFORE INSERT OR UPDATE ON Participa
 FOR EACH ROW EXECUTE PROCEDURE trg_participa_dono();
+
+-- recálculo periódico de qtd_users e qtd_visualizacoes (agendar)
+CREATE OR REPLACE FUNCTION recalcular_derivados() RETURNS void AS $$
+BEGIN
+    UPDATE Canal c
+       SET qtd_visualizacoes = s.vis, qtd_videos = s.vid
+      FROM (SELECT ca.id_canal, COALESCE(SUM(v.visu_total), 0) AS vis, COUNT(v.id_video) AS vid
+              FROM Canal ca LEFT JOIN Video v ON v.id_canal = ca.id_canal
+             GROUP BY ca.id_canal) AS s
+     WHERE s.id_canal = c.id_canal
+       AND (c.qtd_visualizacoes <> s.vis OR c.qtd_videos <> s.vid);
+
+    UPDATE Plataforma p
+       SET qtd_users = s.n
+      FROM (SELECT pl.nro, COUNT(pu.id_usuario) AS n
+              FROM Plataforma pl LEFT JOIN PlataformaUsuario pu ON pu.nro_plataforma = pl.nro
+             GROUP BY pl.nro) AS s
+     WHERE s.nro = p.nro
+       AND p.qtd_users <> s.n;
+END;
+$$ LANGUAGE plpgsql;
