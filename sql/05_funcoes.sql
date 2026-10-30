@@ -118,3 +118,63 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+-- consulta 5
+CREATE OR REPLACE FUNCTION patrocinios_por_empresa(p_empresa INTEGER DEFAULT NULL)
+RETURNS TABLE (nro_empresa INTEGER, empresa VARCHAR, canal VARCHAR,
+               nro_plataforma INTEGER, valor_usd NUMERIC) AS $$
+BEGIN
+    IF p_empresa IS NULL THEN
+        RETURN QUERY
+        SELECT v.nro_empresa, v.empresa, v.canal, v.nro_plataforma, v.valor_usd
+          FROM vw_patrocinio_empresa v
+         ORDER BY v.nro_empresa, v.valor_usd DESC;
+    ELSE
+        RETURN QUERY
+        SELECT v.nro_empresa, v.empresa, v.canal, v.nro_plataforma, v.valor_usd
+          FROM vw_patrocinio_empresa v
+         WHERE v.nro_empresa = p_empresa
+         ORDER BY v.valor_usd DESC;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- consulta 6
+CREATE OR REPLACE FUNCTION gasto_dos_membros(p_usuario VARCHAR DEFAULT NULL)
+RETURNS TABLE (usuario VARCHAR, qtd_canais BIGINT, total_mensal_usd NUMERIC) AS $$
+BEGIN
+    IF p_usuario IS NULL THEN
+        RETURN QUERY
+        SELECT v.nick, v.qtd_canais, v.total_mensal_usd
+          FROM vw_membro_usuario v
+         ORDER BY v.total_mensal_usd DESC;
+    ELSE
+        RETURN QUERY
+        SELECT v.nick, v.qtd_canais, v.total_mensal_usd
+          FROM vw_membro_usuario v
+         WHERE v.nick = p_usuario;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- consulta 7
+CREATE OR REPLACE FUNCTION canais_com_doacao(p_canal VARCHAR DEFAULT NULL, p_plataforma INTEGER DEFAULT NULL)
+RETURNS TABLE (canal VARCHAR, nro_plataforma INTEGER, total_usd NUMERIC) AS $$
+DECLARE
+    v_canal Canal.id_canal%TYPE;
+BEGIN
+    IF p_canal IS NULL THEN
+        RETURN QUERY
+        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd, 2)
+          FROM mv_resumo_canal m
+         WHERE m.qtd_doacoes > 0
+         ORDER BY m.doacoes_usd DESC;
+    ELSE
+        v_canal := id_do_canal(p_canal, p_plataforma);
+        RETURN QUERY
+        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd, 2)
+          FROM mv_resumo_canal m
+         WHERE m.id_canal = v_canal AND m.qtd_doacoes > 0;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
