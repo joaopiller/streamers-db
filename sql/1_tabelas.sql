@@ -1,4 +1,5 @@
-\set ON_ERROR_STOP on
+-- tabelas do banco de streamers (DDL)
+-- ordem: 1_tabelas, 2_plsql, 3_dados, 4_consultas
 SET client_encoding = 'UTF8';
 
 DROP TABLE IF EXISTS MecanismoPlat, CartaoCredito, PayPal, BitCoin, Doacao,
@@ -77,6 +78,7 @@ CREATE TABLE StreamerPais (
 );
 
 -- o canal é identificado por (nome, plataforma); o id_canal evita levar essa chave pras outras tabelas
+-- fillfactor 70 deixa folga pra nova versão da linha caber na mesma página quando os contadores mudam
 CREATE TABLE Canal (
     id_canal INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
@@ -126,7 +128,7 @@ CREATE TABLE Inscricao (
         REFERENCES NivelCanal(id_canal, nivel) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
--- id_video no lugar da chave (canal, data, título)
+-- id_video no lugar da chave (canal, data, título); BIGINT porque a tabela cresce sem limite
 CREATE TABLE Video (
     id_video BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_canal INTEGER NOT NULL REFERENCES Canal(id_canal) ON DELETE CASCADE,
@@ -148,7 +150,7 @@ CREATE TABLE Participa (
     PRIMARY KEY (id_video, id_streamer)
 );
 
--- seq conta por vídeo e usuário
+-- seq conta por vídeo e usuário; usuário que tem comentário não pode ser apagado
 CREATE TABLE Comentario (
     id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_usuario INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE RESTRICT,
@@ -161,6 +163,7 @@ CREATE TABLE Comentario (
 );
 
 -- cada comentário traz no máximo uma doação; valor na moeda do país do doador
+-- id_doacao evita repetir a chave do comentário nas formas de pagamento
 CREATE TABLE Doacao (
     id_doacao BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_video BIGINT NOT NULL,

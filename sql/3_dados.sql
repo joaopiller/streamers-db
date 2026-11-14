@@ -1,4 +1,5 @@
-\set ON_ERROR_STOP on
+-- carga de dados artificiais (cerca de 800 mil linhas nas tabelas grandes)
+-- ordem: 1_tabelas, 2_plsql, 3_dados, 4_consultas
 SET client_encoding = 'UTF8';
 
 BEGIN;
@@ -327,8 +328,9 @@ WHERE s.nro_plataforma = p.nro;
 
 COMMIT;
 
-VACUUM FULL Canal, Plataforma;
 ANALYZE;
+-- tira as versões mortas que o UPDATE dos derivados deixou; precisa do psql, não roda dentro de transação
+VACUUM FULL Canal, Plataforma;
 
 SELECT 'Conversao' AS tabela, count(*) AS tuplas FROM Conversao UNION ALL
 SELECT 'Pais', count(*) FROM Pais UNION ALL
