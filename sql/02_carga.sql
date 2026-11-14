@@ -314,7 +314,7 @@ FROM tmp_doacao t
 JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
 WHERE t.r_forma >= 0.80;
 
--- acerta os derivados no fim, porque os triggers ainda não existem
+-- acerta os atributos derivados no fim da carga
 UPDATE Canal c
 SET qtd_videos = s.n, qtd_visualizacoes = s.v
 FROM (SELECT id_canal, count(*) AS n, sum(visu_total) AS v FROM Video GROUP BY id_canal) AS s

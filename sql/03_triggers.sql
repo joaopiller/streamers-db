@@ -2,35 +2,16 @@
 SET client_encoding = 'UTF8';
 
 DROP TRIGGER IF EXISTS comentario_bi ON Comentario;
-DROP TRIGGER IF EXISTS comentario_bu ON Comentario;
-DROP TRIGGER IF EXISTS doacao_total_ai ON Doacao;
 DROP TRIGGER IF EXISTS mecplat_seq_bi ON MecanismoPlat;
-DROP TRIGGER IF EXISTS video_data_bi ON Video;
-DROP TRIGGER IF EXISTS video_qtd_ai ON Video;
-DROP TRIGGER IF EXISTS video_qtd_ad ON Video;
-DROP TRIGGER IF EXISTS video_qtd_au ON Video;
 DROP TRIGGER IF EXISTS bitcoin_subtipo_bi ON BitCoin;
 DROP TRIGGER IF EXISTS paypal_subtipo_bi ON PayPal;
 DROP TRIGGER IF EXISTS cartaocredito_subtipo_bi ON CartaoCredito;
 DROP TRIGGER IF EXISTS mecanismoplat_subtipo_bi ON MecanismoPlat;
-DROP TRIGGER IF EXISTS participa_dono_bi ON Participa;
-DROP TRIGGER IF EXISTS bitcoin_forma_ad ON BitCoin;
-DROP TRIGGER IF EXISTS paypal_forma_ad ON PayPal;
-DROP TRIGGER IF EXISTS cartaocredito_forma_ad ON CartaoCredito;
-DROP TRIGGER IF EXISTS mecanismoplat_forma_ad ON MecanismoPlat;
+DROP TRIGGER IF EXISTS doacao_total_ai ON Doacao;
 
--- numera o comentário (seq por vídeo e usuário) e barra data anterior à do vídeo
+-- numera o comentário (seq por vídeo e usuário)
 CREATE OR REPLACE FUNCTION trg_comentario_insere() RETURNS trigger AS $$
-DECLARE
-    v_data_video Video.dataH%TYPE;
 BEGIN
-    SELECT dataH INTO v_data_video FROM Video WHERE id_video = NEW.id_video;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Vídeo % não existe', NEW.id_video;
-    END IF;
-    IF NEW.dataH < v_data_video THEN
-        RAISE EXCEPTION 'Comentário (%) anterior ao vídeo % (%)', NEW.dataH, NEW.id_video, v_data_video;
-    END IF;
     IF NEW.seq IS NULL THEN
         -- trava o usuário pra duas sessões não pegarem o mesmo seq
         PERFORM 1 FROM Usuario WHERE id_usuario = NEW.id_usuario FOR NO KEY UPDATE;
@@ -45,23 +26,6 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER comentario_bi
 BEFORE INSERT ON Comentario
 FOR EACH ROW EXECUTE PROCEDURE trg_comentario_insere();
-
--- mesma checagem de data quando o comentário é alterado
-CREATE OR REPLACE FUNCTION trg_comentario_atualiza() RETURNS trigger AS $$
-DECLARE
-    v_data_video Video.dataH%TYPE;
-BEGIN
-    SELECT dataH INTO v_data_video FROM Video WHERE id_video = NEW.id_video;
-    IF NEW.dataH < v_data_video THEN
-        RAISE EXCEPTION 'Comentário (%) anterior ao vídeo % (%)', NEW.dataH, NEW.id_video, v_data_video;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER comentario_bu
-BEFORE UPDATE OF dataH, id_video ON Comentario
-FOR EACH ROW EXECUTE PROCEDURE trg_comentario_atualiza();
 
 -- numera as doações pelo mecanismo da plataforma que o usuário fez naquele vídeo
 CREATE OR REPLACE FUNCTION trg_mecplat_seq() RETURNS trigger AS $$
@@ -86,57 +50,6 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER mecplat_seq_bi
 BEFORE INSERT ON MecanismoPlat
 FOR EACH ROW EXECUTE PROCEDURE trg_mecplat_seq();
-
--- vídeo não pode ser anterior ao início do canal
-CREATE OR REPLACE FUNCTION trg_video_data() RETURNS trigger AS $$
-DECLARE
-    v_inicio Canal.data_inicio%TYPE;
-BEGIN
-    SELECT data_inicio INTO v_inicio FROM Canal WHERE id_canal = NEW.id_canal;
-    IF NEW.dataH < v_inicio THEN
-        RAISE EXCEPTION 'Vídeo (%) anterior ao início do canal % (%)', NEW.dataH, NEW.id_canal, v_inicio;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER video_data_bi
-BEFORE INSERT OR UPDATE OF dataH, id_canal ON Video
-FOR EACH ROW EXECUTE PROCEDURE trg_video_data();
-
--- mantém Canal.qtd_videos quando um vídeo entra, sai ou muda de canal
-CREATE OR REPLACE FUNCTION trg_video_insere() RETURNS trigger AS $$
-BEGIN
-    UPDATE Canal SET qtd_videos = qtd_videos + 1 WHERE id_canal = NEW.id_canal;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION trg_video_remove() RETURNS trigger AS $$
-BEGIN
-    UPDATE Canal SET qtd_videos = qtd_videos - 1 WHERE id_canal = OLD.id_canal;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION trg_video_muda_canal() RETURNS trigger AS $$
-BEGIN
-    IF NEW.id_canal <> OLD.id_canal THEN
-        UPDATE Canal SET qtd_videos = qtd_videos - 1 WHERE id_canal = OLD.id_canal;
-        UPDATE Canal SET qtd_videos = qtd_videos + 1 WHERE id_canal = NEW.id_canal;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER video_qtd_ai AFTER INSERT ON Video
-FOR EACH ROW EXECUTE PROCEDURE trg_video_insere();
-
-CREATE TRIGGER video_qtd_ad AFTER DELETE ON Video
-FOR EACH ROW EXECUTE PROCEDURE trg_video_remove();
-
-CREATE TRIGGER video_qtd_au AFTER UPDATE OF id_canal ON Video
-FOR EACH ROW EXECUTE PROCEDURE trg_video_muda_canal();
 
 -- a doação só pode ter uma forma de pagamento
 CREATE OR REPLACE FUNCTION trg_doacao_subtipo() RETURNS trigger AS $$
@@ -189,59 +102,6 @@ AFTER INSERT ON Doacao
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE PROCEDURE trg_doacao_total();
 
--- tirar a forma de pagamento não pode deixar a doação sem nenhuma
-CREATE OR REPLACE FUNCTION trg_forma_remove() RETURNS trigger AS $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM Doacao WHERE id_doacao = OLD.id_doacao)
-       AND NOT (EXISTS (SELECT 1 FROM BitCoin WHERE id_doacao = OLD.id_doacao)
-                OR EXISTS (SELECT 1 FROM PayPal WHERE id_doacao = OLD.id_doacao)
-                OR EXISTS (SELECT 1 FROM CartaoCredito WHERE id_doacao = OLD.id_doacao)
-                OR EXISTS (SELECT 1 FROM MecanismoPlat WHERE id_doacao = OLD.id_doacao)) THEN
-        RAISE EXCEPTION 'Doação % sem forma de pagamento', OLD.id_doacao;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER bitcoin_forma_ad
-AFTER DELETE OR UPDATE OF id_doacao ON BitCoin
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE PROCEDURE trg_forma_remove();
-
-CREATE CONSTRAINT TRIGGER paypal_forma_ad
-AFTER DELETE OR UPDATE OF id_doacao ON PayPal
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE PROCEDURE trg_forma_remove();
-
-CREATE CONSTRAINT TRIGGER cartaocredito_forma_ad
-AFTER DELETE OR UPDATE OF id_doacao ON CartaoCredito
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE PROCEDURE trg_forma_remove();
-
-CREATE CONSTRAINT TRIGGER mecanismoplat_forma_ad
-AFTER DELETE OR UPDATE OF id_doacao ON MecanismoPlat
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE PROCEDURE trg_forma_remove();
-
--- o dono do canal não é cadastrado como participante
-CREATE OR REPLACE FUNCTION trg_participa_dono() RETURNS trigger AS $$
-DECLARE
-    v_dono Canal.id_streamer%TYPE;
-BEGIN
-    SELECT c.id_streamer INTO v_dono
-      FROM Video v JOIN Canal c ON c.id_canal = v.id_canal
-     WHERE v.id_video = NEW.id_video;
-    IF v_dono = NEW.id_streamer THEN
-        RAISE EXCEPTION 'Streamer % é dono do canal do vídeo %', NEW.id_streamer, NEW.id_video;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER participa_dono_bi
-BEFORE INSERT OR UPDATE ON Participa
-FOR EACH ROW EXECUTE PROCEDURE trg_participa_dono();
-
 -- recalcula os atributos derivados, pra rodar de tempos em tempos
 CREATE OR REPLACE FUNCTION recalcular_derivados() RETURNS void AS $$
 BEGIN
@@ -262,4 +122,3 @@ BEGIN
        AND p.qtd_users <> s.n;
 END;
 $$ LANGUAGE plpgsql;
-

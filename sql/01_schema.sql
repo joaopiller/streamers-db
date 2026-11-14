@@ -141,7 +141,7 @@ CREATE TABLE Video (
     CONSTRAINT ck_video_visu CHECK (visu_simul >= 0 AND visu_total >= 0 AND visu_simul <= visu_total)
 ) WITH (fillfactor = 80);
 
--- streamers convidados no vídeo, o dono do canal não entra aqui
+-- streamers que participam do vídeo além do dono do canal
 CREATE TABLE Participa (
     id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_streamer INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE CASCADE,
@@ -200,6 +200,6 @@ CREATE TABLE MecanismoPlat (
 );
 
 COMMENT ON COLUMN Plataforma.qtd_users IS 'Derivado: COUNT(PlataformaUsuario). Recálculo periódico.';
-COMMENT ON COLUMN Canal.qtd_videos IS 'Derivado: COUNT(Video). Mantido por trigger.';
+COMMENT ON COLUMN Canal.qtd_videos IS 'Derivado: COUNT(Video). Recálculo periódico.';
 COMMENT ON COLUMN Canal.qtd_visualizacoes IS 'Derivado: SUM(Video.visu_total). Recálculo periódico.';
 COMMENT ON COLUMN Doacao.valor IS 'Na moeda do país de residência do doador; converter via Conversao.fator_conver.';
