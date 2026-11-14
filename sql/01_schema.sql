@@ -18,7 +18,7 @@ CREATE TABLE Conversao (
 CREATE TABLE Pais (
     DDI INTEGER PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
-    moeda CHAR(3) NOT NULL REFERENCES Conversao(moeda)
+    moeda CHAR(3) NOT NULL REFERENCES Conversao(moeda) ON UPDATE CASCADE
 );
 
 -- empresas e o identificador nacional delas em cada país
@@ -30,7 +30,7 @@ CREATE TABLE Empresa (
 
 CREATE TABLE EmpresaPais (
     nro_empresa INTEGER NOT NULL REFERENCES Empresa(nro) ON DELETE CASCADE,
-    ddi_pais INTEGER NOT NULL REFERENCES Pais(DDI),
+    ddi_pais INTEGER NOT NULL REFERENCES Pais(DDI) ON UPDATE CASCADE,
     id_nacional VARCHAR(30) NOT NULL,
     PRIMARY KEY (nro_empresa, ddi_pais),
     CONSTRAINT uq_empresapais_idnacional UNIQUE (ddi_pais, id_nacional)
@@ -55,7 +55,7 @@ CREATE TABLE Usuario (
     data_nasc DATE NOT NULL,
     telefone VARCHAR(20) NOT NULL,
     end_postal VARCHAR(200),
-    pais_residencia INTEGER NOT NULL REFERENCES Pais(DDI)
+    pais_residencia INTEGER NOT NULL REFERENCES Pais(DDI) ON UPDATE CASCADE
 );
 
 -- número do usuário em cada plataforma
@@ -70,7 +70,7 @@ CREATE TABLE PlataformaUsuario (
 -- passaportes dos streamers
 CREATE TABLE StreamerPais (
     id_streamer INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE CASCADE,
-    ddi_pais INTEGER NOT NULL REFERENCES Pais(DDI),
+    ddi_pais INTEGER NOT NULL REFERENCES Pais(DDI) ON UPDATE CASCADE,
     nro_passaporte VARCHAR(30) NOT NULL,
     PRIMARY KEY (id_streamer, ddi_pais),
     CONSTRAINT uq_streamer_passaporte UNIQUE (ddi_pais, nro_passaporte)
@@ -123,7 +123,7 @@ CREATE TABLE Inscricao (
     nivel SMALLINT NOT NULL,
     PRIMARY KEY (id_membro, id_canal),
     CONSTRAINT fk_inscricao_nivel FOREIGN KEY (id_canal, nivel)
-        REFERENCES NivelCanal(id_canal, nivel) ON DELETE CASCADE
+        REFERENCES NivelCanal(id_canal, nivel) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- id_video no lugar da chave (canal, data, título)
@@ -171,7 +171,7 @@ CREATE TABLE Doacao (
     status VARCHAR(10) NOT NULL,
     CONSTRAINT uq_doacao_natural UNIQUE (id_video, id_usuario, seq_comentario, seq_pg),
     CONSTRAINT fk_doacao_comentario FOREIGN KEY (id_video, id_usuario, seq_comentario)
-        REFERENCES Comentario(id_video, id_usuario, seq) ON DELETE CASCADE,
+        REFERENCES Comentario(id_video, id_usuario, seq) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT ck_doacao_seq CHECK (seq_pg > 0),
     CONSTRAINT ck_doacao_valor CHECK (valor > 0),
     CONSTRAINT ck_doacao_status CHECK (status IN ('recusado', 'recebido', 'lido'))
