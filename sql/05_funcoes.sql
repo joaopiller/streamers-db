@@ -100,14 +100,14 @@ RETURNS TABLE (canal VARCHAR, nro_plataforma INTEGER, media_por_comentario NUMER
 BEGIN
     IF p_plataforma IS NULL THEN
         RETURN QUERY
-        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd / m.coment_com_doacao, 2),
+        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd / m.qtd_doacoes, 2),
                m.qtd_doacoes::BIGINT, round(m.doacoes_usd, 2)
           FROM mv_resumo_canal m
          WHERE m.qtd_doacoes > 0
          ORDER BY 3 DESC;
     ELSE
         RETURN QUERY
-        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd / m.coment_com_doacao, 2),
+        SELECT m.nome, m.nro_plataforma, round(m.doacoes_usd / m.qtd_doacoes, 2),
                m.qtd_doacoes::BIGINT, round(m.doacoes_usd, 2)
           FROM mv_resumo_canal m
          WHERE m.nro_plataforma = p_plataforma AND m.qtd_doacoes > 0

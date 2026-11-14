@@ -269,25 +269,25 @@ FROM tmp_coment;
 
 -- 45% dos comentários têm doação, com valor na moeda do país do doador
 CREATE TEMP TABLE tmp_doacao ON COMMIT DROP AS
-SELECT t.id_video, t.id_usuario, t.seq AS seq_comentario, k AS seq_pg, t.dataH,
+SELECT t.id_video, t.id_usuario, t.seq AS seq_comentario, t.dataH,
        round((power(10, random() * 2.5) / cv.fator_conver)::numeric, 2) AS valor,
        random() AS r_status, random() AS r_forma
-FROM (SELECT *, (random() < 0.45)::int * (1 + (random() < 0.07)::int) AS qtd FROM tmp_coment) AS t
-CROSS JOIN generate_series(1, t.qtd) AS k
+FROM (SELECT *, random() < 0.45 AS doou FROM tmp_coment) AS t
 JOIN Usuario u ON u.id_usuario = t.id_usuario
 JOIN Pais pa ON pa.DDI = u.pais_residencia
-JOIN Conversao cv ON cv.moeda = pa.moeda;
+JOIN Conversao cv ON cv.moeda = pa.moeda
+WHERE t.doou;
 
-INSERT INTO Doacao (id_video, id_usuario, seq_comentario, seq_pg, valor, status)
-SELECT id_video, id_usuario, seq_comentario, seq_pg, valor,
+INSERT INTO Doacao (id_video, id_usuario, seq_comentario, valor, status)
+SELECT id_video, id_usuario, seq_comentario, valor,
        CASE WHEN r_status < 0.08 THEN 'recusado' WHEN r_status < 0.38 THEN 'recebido' ELSE 'lido' END
 FROM tmp_doacao;
 
 INSERT INTO MecanismoPlat (id_doacao, seq_plataforma)
 SELECT d.id_doacao,
-       row_number() OVER (PARTITION BY d.id_video, d.id_usuario, d.seq_comentario ORDER BY d.seq_pg)
+       row_number() OVER (PARTITION BY d.id_video, d.id_usuario ORDER BY d.seq_comentario)
 FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario, seq_pg)
+JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
 WHERE t.r_forma < 0.34;
 
 INSERT INTO CartaoCredito (id_doacao, nro, bandeira, dataH)
@@ -298,20 +298,20 @@ SELECT s.id_doacao,
 FROM (
     SELECT d.id_doacao, t.dataH, 1 + floor(4 * power(random(), 1.6))::int AS b
     FROM tmp_doacao t
-    JOIN Doacao d USING (id_video, id_usuario, seq_comentario, seq_pg)
+    JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
     WHERE t.r_forma >= 0.34 AND t.r_forma < 0.58
 ) AS s;
 
 INSERT INTO PayPal (id_doacao, IdPayPal)
 SELECT d.id_doacao, 'PAYID-' || upper(substr(md5(random()::text), 1, 24))
 FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario, seq_pg)
+JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
 WHERE t.r_forma >= 0.58 AND t.r_forma < 0.80;
 
 INSERT INTO BitCoin (id_doacao, TxID)
 SELECT d.id_doacao, md5(random()::text) || md5(random()::text)
 FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario, seq_pg)
+JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
 WHERE t.r_forma >= 0.80;
 
 -- acerta os derivados no fim, porque os triggers ainda não existem

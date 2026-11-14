@@ -160,19 +160,17 @@ CREATE TABLE Comentario (
     CONSTRAINT ck_comentario_seq CHECK (seq > 0)
 );
 
--- a doação pertence a um comentário; valor na moeda do país do doador
+-- cada comentário traz no máximo uma doação; valor na moeda do país do doador
 CREATE TABLE Doacao (
     id_doacao BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_video BIGINT NOT NULL,
     id_usuario INTEGER NOT NULL,
     seq_comentario INTEGER NOT NULL,
-    seq_pg INTEGER NOT NULL,
     valor NUMERIC(14,2) NOT NULL,
     status VARCHAR(10) NOT NULL,
-    CONSTRAINT uq_doacao_natural UNIQUE (id_video, id_usuario, seq_comentario, seq_pg),
+    CONSTRAINT uq_doacao_comentario UNIQUE (id_video, id_usuario, seq_comentario),
     CONSTRAINT fk_doacao_comentario FOREIGN KEY (id_video, id_usuario, seq_comentario)
         REFERENCES Comentario(id_video, id_usuario, seq) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT ck_doacao_seq CHECK (seq_pg > 0),
     CONSTRAINT ck_doacao_valor CHECK (valor > 0),
     CONSTRAINT ck_doacao_status CHECK (status IN ('recusado', 'recebido', 'lido'))
 );

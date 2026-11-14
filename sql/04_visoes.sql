@@ -15,7 +15,6 @@ SELECT c.id_canal,
        COALESCE(i.qtd, 0) AS interacoes,
        COALESCE(m.qtd, 0)::INTEGER AS qtd_membros,
        COALESCE(d.qtd, 0)::INTEGER AS qtd_doacoes,
-       COALESCE(d.qtd_coment, 0)::INTEGER AS coment_com_doacao,
        s.nick AS streamer,
        c.nome,
        COALESCE(p.total_usd, 0) AS patrocinio_usd,
@@ -41,9 +40,7 @@ LEFT JOIN (
     GROUP BY v.id_canal
 ) i ON i.id_canal = c.id_canal
 LEFT JOIN (
-    SELECT v.id_canal, COUNT(*) AS qtd,
-           COUNT(DISTINCT (d.id_video, d.id_usuario, d.seq_comentario)) AS qtd_coment,
-           SUM(d.valor * cv.fator_conver) AS total_usd
+    SELECT v.id_canal, COUNT(*) AS qtd, SUM(d.valor * cv.fator_conver) AS total_usd
     FROM Doacao d
     JOIN Video v ON v.id_video = d.id_video
     JOIN Usuario u ON u.id_usuario = d.id_usuario
