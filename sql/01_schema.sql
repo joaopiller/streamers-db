@@ -128,7 +128,7 @@ CREATE TABLE Inscricao (
 
 -- id_video no lugar da chave (canal, data, título)
 CREATE TABLE Video (
-    id_video INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_video BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_canal INTEGER NOT NULL REFERENCES Canal(id_canal) ON DELETE CASCADE,
     titulo VARCHAR(200) NOT NULL,
     dataH TIMESTAMP NOT NULL,
@@ -143,14 +143,14 @@ CREATE TABLE Video (
 
 -- streamers convidados no vídeo, o dono do canal não entra aqui
 CREATE TABLE Participa (
-    id_video INTEGER NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
+    id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_streamer INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE CASCADE,
     PRIMARY KEY (id_video, id_streamer)
 );
 
 -- seq conta por vídeo e usuário
 CREATE TABLE Comentario (
-    id_video INTEGER NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
+    id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_usuario INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE RESTRICT,
     seq INTEGER NOT NULL,
     texto TEXT NOT NULL,
@@ -162,8 +162,8 @@ CREATE TABLE Comentario (
 
 -- a doação pertence a um comentário; valor na moeda do país do doador
 CREATE TABLE Doacao (
-    id_doacao INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    id_video INTEGER NOT NULL,
+    id_doacao BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_video BIGINT NOT NULL,
     id_usuario INTEGER NOT NULL,
     seq_comentario INTEGER NOT NULL,
     seq_pg INTEGER NOT NULL,
@@ -179,24 +179,24 @@ CREATE TABLE Doacao (
 
 -- formas de pagamento: cada doação fica em exatamente uma destas quatro tabelas
 CREATE TABLE BitCoin (
-    id_doacao INTEGER PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
     TxID VARCHAR(128) NOT NULL UNIQUE
 );
 
 CREATE TABLE PayPal (
-    id_doacao INTEGER PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
     IdPayPal VARCHAR(100) NOT NULL UNIQUE
 );
 
 CREATE TABLE CartaoCredito (
-    id_doacao INTEGER PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
     nro VARCHAR(25) NOT NULL,
     bandeira VARCHAR(30) NOT NULL,
     dataH TIMESTAMP NOT NULL
 );
 
 CREATE TABLE MecanismoPlat (
-    id_doacao INTEGER PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
     seq_plataforma INTEGER NOT NULL,
     CONSTRAINT ck_mecplat_seq CHECK (seq_plataforma > 0)
 );
