@@ -177,7 +177,7 @@ EXCEPTION
     WHEN too_many_rows THEN
         RAISE EXCEPTION 'Canal "%" existe em mais de uma plataforma: informe também o nro da plataforma', p_canal;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 1: streamers com mais vídeos, filtro opcional por plataforma
 CREATE OR REPLACE FUNCTION streamers_mais_videos(p_plataforma INTEGER DEFAULT NULL)
@@ -199,7 +199,7 @@ BEGIN
          ORDER BY s.qtd_videos DESC, s.qtd_visualizacoes DESC;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 2: vídeos mais comentados (online, offline e total), filtro opcional por canal
 CREATE OR REPLACE FUNCTION videos_mais_comentados(p_canal VARCHAR DEFAULT NULL, p_plataforma INTEGER DEFAULT NULL)
@@ -226,7 +226,7 @@ BEGIN
          ORDER BY i.coment_online + i.coment_offline DESC;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 3: canais por total de interações e média por vídeo, filtro opcional por streamer
 CREATE OR REPLACE FUNCTION canais_por_interacoes(p_streamer VARCHAR DEFAULT NULL)
@@ -248,7 +248,7 @@ BEGIN
          ORDER BY m.interacoes DESC;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 4: canais pela média de doação por comentário, filtro opcional por plataforma
 CREATE OR REPLACE FUNCTION canais_por_media_doacao(p_plataforma INTEGER DEFAULT NULL)
@@ -271,7 +271,7 @@ BEGIN
          ORDER BY 3 DESC;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 5: canais patrocinados e valores pagos por empresa, filtro opcional por empresa
 CREATE OR REPLACE FUNCTION patrocinios_por_empresa(p_empresa INTEGER DEFAULT NULL)
@@ -291,7 +291,7 @@ BEGIN
          ORDER BY v.valor_usd DESC;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 6: de quantos canais cada usuário é membro e o gasto mensal, filtro opcional por usuário
 CREATE OR REPLACE FUNCTION gasto_dos_membros(p_usuario VARCHAR DEFAULT NULL)
@@ -309,7 +309,7 @@ BEGIN
          WHERE v.nick = p_usuario;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 7: canais que já receberam doação e o total recebido, filtro opcional por canal
 CREATE OR REPLACE FUNCTION canais_com_doacao(p_canal VARCHAR DEFAULT NULL, p_plataforma INTEGER DEFAULT NULL)
@@ -332,7 +332,7 @@ BEGIN
            AND m.id_canal = v_canal AND m.qtd_doacoes > 0;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 8: os k canais com mais patrocínio
 CREATE OR REPLACE FUNCTION top_canais_patrocinio(p_k INTEGER)
@@ -345,7 +345,7 @@ BEGIN
      ORDER BY m.patrocinio_usd DESC, m.id_canal
      LIMIT p_k;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 9: os k canais que mais recebem de membros
 CREATE OR REPLACE FUNCTION top_canais_membros(p_k INTEGER)
@@ -358,7 +358,7 @@ BEGIN
      ORDER BY m.membros_usd_mes DESC, m.id_canal
      LIMIT p_k;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 10: os k canais com mais doações
 CREATE OR REPLACE FUNCTION top_canais_doacoes(p_k INTEGER)
@@ -371,7 +371,7 @@ BEGIN
      ORDER BY m.doacoes_usd DESC, m.id_canal
      LIMIT p_k;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 11: os k canais que mais faturam somando patrocínio, membros e doações
 CREATE OR REPLACE FUNCTION top_canais_faturamento(p_k INTEGER)
@@ -386,7 +386,7 @@ BEGIN
      ORDER BY m.patrocinio_usd + m.membros_usd_mes + m.doacoes_usd DESC, m.id_canal
      LIMIT p_k;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
 
 -- consulta 12: top k plataformas por streamers e canais, filtro opcional por plataforma
 CREATE OR REPLACE FUNCTION top_plataformas(p_k INTEGER, p_plataforma INTEGER DEFAULT NULL)
@@ -413,4 +413,4 @@ BEGIN
          GROUP BY pl.nome;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql STABLE;
