@@ -284,36 +284,32 @@ SELECT id_video, id_usuario, seq_comentario, valor,
        CASE WHEN r_status < 0.08 THEN 'recusado' WHEN r_status < 0.38 THEN 'recebido' ELSE 'lido' END
 FROM tmp_doacao;
 
-INSERT INTO MecanismoPlat (id_doacao, seq_plataforma)
-SELECT d.id_doacao,
-       row_number() OVER (PARTITION BY d.id_video, d.id_usuario ORDER BY d.seq_comentario)
-FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
-WHERE t.r_forma < 0.34;
+-- as formas de pagamento usam a mesma chave da doação; seq_plataforma numera por vídeo e usuário
+INSERT INTO MecanismoPlat (id_video, id_usuario, seq_comentario, seq_plataforma)
+SELECT id_video, id_usuario, seq_comentario,
+       row_number() OVER (PARTITION BY id_video, id_usuario ORDER BY seq_comentario)
+FROM tmp_doacao
+WHERE r_forma < 0.34;
 
-INSERT INTO CartaoCredito (id_doacao, nro, bandeira, dataH)
-SELECT s.id_doacao,
+INSERT INTO CartaoCredito (id_video, id_usuario, seq_comentario, dataH, nro, bandeira)
+SELECT s.id_video, s.id_usuario, s.seq_comentario, s.dataH,
        (ARRAY['4', '5', '6', '3'])[s.b] || lpad(floor(random() * 1e15)::bigint::text, 15, '0'),
-       (ARRAY['Visa', 'Mastercard', 'Elo', 'Amex'])[s.b],
-       s.dataH
+       (ARRAY['Visa', 'Mastercard', 'Elo', 'Amex'])[s.b]
 FROM (
-    SELECT d.id_doacao, t.dataH, 1 + floor(4 * power(random(), 1.6))::int AS b
-    FROM tmp_doacao t
-    JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
-    WHERE t.r_forma >= 0.34 AND t.r_forma < 0.58
+    SELECT id_video, id_usuario, seq_comentario, dataH, 1 + floor(4 * power(random(), 1.6))::int AS b
+    FROM tmp_doacao
+    WHERE r_forma >= 0.34 AND r_forma < 0.58
 ) AS s;
 
-INSERT INTO PayPal (id_doacao, IdPayPal)
-SELECT d.id_doacao, 'PAYID-' || upper(substr(md5(random()::text), 1, 24))
-FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
-WHERE t.r_forma >= 0.58 AND t.r_forma < 0.80;
+INSERT INTO PayPal (id_video, id_usuario, seq_comentario, IdPayPal)
+SELECT id_video, id_usuario, seq_comentario, 'PAYID-' || upper(substr(md5(random()::text), 1, 24))
+FROM tmp_doacao
+WHERE r_forma >= 0.58 AND r_forma < 0.80;
 
-INSERT INTO BitCoin (id_doacao, TxID)
-SELECT d.id_doacao, md5(random()::text) || md5(random()::text)
-FROM tmp_doacao t
-JOIN Doacao d USING (id_video, id_usuario, seq_comentario)
-WHERE t.r_forma >= 0.80;
+INSERT INTO BitCoin (id_video, id_usuario, seq_comentario, TxID)
+SELECT id_video, id_usuario, seq_comentario, md5(random()::text) || md5(random()::text)
+FROM tmp_doacao
+WHERE r_forma >= 0.80;
 
 -- acerta os atributos derivados no fim da carga
 UPDATE Canal c

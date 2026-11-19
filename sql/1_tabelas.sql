@@ -162,43 +162,63 @@ CREATE TABLE Comentario (
     CONSTRAINT ck_comentario_seq CHECK (seq > 0)
 );
 
--- cada comentário traz no máximo uma doação; valor na moeda do país do doador
--- id_doacao evita repetir a chave do comentário nas formas de pagamento
+-- cada comentário traz no máximo uma doação, então a chave do comentário já identifica a doação
+-- valor na moeda do país do doador
 CREATE TABLE Doacao (
-    id_doacao BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_video INTEGER NOT NULL,
     id_usuario INTEGER NOT NULL,
     seq_comentario INTEGER NOT NULL,
     valor NUMERIC(14,2) NOT NULL,
     status VARCHAR(10) NOT NULL,
-    CONSTRAINT uq_doacao_comentario UNIQUE (id_video, id_usuario, seq_comentario),
+    PRIMARY KEY (id_video, id_usuario, seq_comentario),
     CONSTRAINT fk_doacao_comentario FOREIGN KEY (id_video, id_usuario, seq_comentario)
         REFERENCES Comentario(id_video, id_usuario, seq) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT ck_doacao_valor CHECK (valor > 0),
     CONSTRAINT ck_doacao_status CHECK (status IN ('recusado', 'recebido', 'lido'))
 );
 
--- formas de pagamento: cada doação fica em exatamente uma destas quatro tabelas
+-- formas de pagamento: cada doação fica em uma destas quatro tabelas, inserida na mesma transação da doação
 CREATE TABLE BitCoin (
-    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
-    TxID VARCHAR(128) NOT NULL UNIQUE
+    id_video INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+    seq_comentario INTEGER NOT NULL,
+    TxID VARCHAR(128) NOT NULL UNIQUE,
+    PRIMARY KEY (id_video, id_usuario, seq_comentario),
+    CONSTRAINT fk_bitcoin_doacao FOREIGN KEY (id_video, id_usuario, seq_comentario)
+        REFERENCES Doacao(id_video, id_usuario, seq_comentario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE PayPal (
-    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
-    IdPayPal VARCHAR(100) NOT NULL UNIQUE
+    id_video INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+    seq_comentario INTEGER NOT NULL,
+    IdPayPal VARCHAR(100) NOT NULL UNIQUE,
+    PRIMARY KEY (id_video, id_usuario, seq_comentario),
+    CONSTRAINT fk_paypal_doacao FOREIGN KEY (id_video, id_usuario, seq_comentario)
+        REFERENCES Doacao(id_video, id_usuario, seq_comentario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 CREATE TABLE CartaoCredito (
-    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_video INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+    seq_comentario INTEGER NOT NULL,
     nro VARCHAR(25) NOT NULL,
     bandeira VARCHAR(30) NOT NULL,
-    dataH TIMESTAMP NOT NULL
+    dataH TIMESTAMP NOT NULL,
+    PRIMARY KEY (id_video, id_usuario, seq_comentario),
+    CONSTRAINT fk_cartao_doacao FOREIGN KEY (id_video, id_usuario, seq_comentario)
+        REFERENCES Doacao(id_video, id_usuario, seq_comentario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+-- seq_plataforma conta as doações do usuário no vídeo por este mecanismo e vem de quem insere
 CREATE TABLE MecanismoPlat (
-    id_doacao BIGINT PRIMARY KEY REFERENCES Doacao(id_doacao) ON DELETE CASCADE,
+    id_video INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+    seq_comentario INTEGER NOT NULL,
     seq_plataforma INTEGER NOT NULL,
+    PRIMARY KEY (id_video, id_usuario, seq_comentario),
+    CONSTRAINT fk_mecplat_doacao FOREIGN KEY (id_video, id_usuario, seq_comentario)
+        REFERENCES Doacao(id_video, id_usuario, seq_comentario) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT ck_mecplat_seq CHECK (seq_plataforma > 0)
 );
 
