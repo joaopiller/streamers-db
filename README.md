@@ -1,19 +1,68 @@
 # Streamers DB
 
-Banco de dados em PostgreSQL para uma plataforma de streaming de jogos: plataformas, canais, vídeos, comentários, membros, patrocínios e doações em várias moedas. O foco é a modelagem e a otimização para alto volume, com cerca de 800 mil linhas nas tabelas principais.
+Banco de dados em PostgreSQL para uma plataforma de streaming de jogos: plataformas, canais, vídeos, comentários, membros, patrocínios e doações em várias moedas. São 20 tabelas, cerca de 800 mil linhas nas maiores e 1,1 GB de dados sintéticos reproduzíveis.
 
-## Destaques
+**Tecnologias:** PostgreSQL 18, SQL e PL/pgSQL.
 
-- **Escrita barata, leitura pronta.** As tabelas base ficam só com os índices de chave primária e `UNIQUE`. As consultas analíticas leem duas visões materializadas, uma por canal e outra por vídeo, que já trazem as junções e agregações calculadas.
-- **Índices onde não custam na inserção.** Os cinco índices de apoio ficam nas visões materializadas e só são mantidos no `REFRESH`: B+ composto com `CLUSTER`, hash para busca por igualdade, B+ ordenado para ranking e B+ sobre expressão para o ranking de receita.
+## Objetivo
+
+Numa plataforma de streaming o banco recebe três tipos de carga ao mesmo tempo:
+
+- **Inserções em alto volume.** Comentários, doações e pagamentos chegam o tempo todo durante as lives.
+- **Atualizações frequentes.** Visualizações dos vídeos, status das doações, cotação das moedas, nível dos membros e contadores dos canais.
+- **Consultas analíticas.** Doze relatórios e rankings: canais que mais faturam, vídeos mais comentados, gasto dos membros, entre outros.
+
+Índices e triggers aceleram a leitura, mas cada um deles é custo a mais em toda inserção e atualização. O projeto resolve esse conflito separando os dois caminhos: as tabelas base ficam enxutas para escrever rápido, e as consultas leem visões materializadas que já trazem as junções e agregações prontas.
+
+## Decisões de projeto
+
+### Inserção
+
+- **Sem triggers.** A integridade é garantida só por chaves primárias, `UNIQUE`, `CHECK` e chaves estrangeiras. Nada roda por linha inserida além da verificação dessas restrições.
+- **Só os índices obrigatórios.** As tabelas base têm apenas os índices de chave primária e `UNIQUE`. Os índices de apoio às consultas ficam nas visões materializadas.
+- **Chaves estreitas.** Os identificadores são `INTEGER` (até 2,1 bilhões de linhas). A doação usa a própria chave do comentário, já que cada comentário tem no máximo uma doação. Assim não há identificador artificial nem um segundo índice para manter.
+- **Colunas ordenadas por alinhamento.** No comentário, as colunas de tamanho fixo vêm antes do texto, sem bytes perdidos com preenchimento.
+
+### Atualização
+
+- **`fillfactor` nas tabelas que mudam muito.** As páginas são gravadas com folga para que a nova versão da linha caiba na mesma página. Como nenhuma das colunas atualizadas está em índice, o PostgreSQL faz uma atualização HOT, que não mexe nos índices e não incha a tabela.
+
+  | Tabela | O que muda | `fillfactor` |
+  |---|---|---|
+  | Conversao | cotação, todas as moedas de uma vez | 50 |
+  | Plataforma | `qtd_users`, todas as linhas no recálculo | 50 |
+  | Canal | contadores de vídeos e visualizações | 70 |
+  | Video | visualizações durante e depois da live | 80 |
+  | Doacao | status (`recebido` → `lido`) | 85 |
+  | Inscricao | nível do membro | 90 |
+
+- **Atributos derivados recalculados em lote.** `qtd_videos`, `qtd_visualizacoes` e `qtd_users` não são mantidos a cada inserção: uma função os recalcula periodicamente e só regrava as linhas que mudaram.
+
+### Consulta
+
+- **Duas visões materializadas.** Uma traz o resumo por canal (interações, membros, doações em dólar, patrocínio) e a outra os comentários por vídeo. Elas atendem 10 das 12 consultas.
+- **Índices escolhidos por consulta.** São cinco: B+ composto com `CLUSTER` para o filtro por plataforma, hash para a busca por streamer (sempre igualdade), B+ ordenado para o ranking de membros e B+ sobre expressão para o ranking de receita (soma de três colunas).
 - **Atualização sem bloquear leitura.** `REFRESH MATERIALIZED VIEW CONCURRENTLY`, apoiado num índice único em cada visão.
-- **Consistência entre tabelas no próprio banco.** Triggers numeram comentários e doações sem colisão entre sessões concorrentes (trava de linha com `FOR NO KEY UPDATE`) e garantem que cada doação tenha exatamente uma forma de pagamento, com a verificação adiada para o `COMMIT`.
-- **Consultas parametrizadas.** Doze functions em PL/pgSQL; o filtro opcional segue um caminho separado, para o otimizador usar o índice.
-- **Dados reproduzíveis.** Carga sintética com semente fixa e distribuição desigual: poucos canais concentram a maior parte dos vídeos, comentários e doações.
+- **Filtro opcional em caminho separado.** Cada consulta é uma function em PL/pgSQL. Com e sem filtro há duas queries distintas, para o otimizador usar o índice quando o filtro existe, em vez de um `WHERE x = p OR p IS NULL` que impede isso.
+
+## Resultados medidos
+
+Comparação com a versão anterior do projeto, que usava triggers e chaves `BIGINT`. As medições foram feitas localmente com PostgreSQL 18, sobre a mesma carga.
+
+| Medida | Antes | Depois |
+|---|---|---|
+| Inserir 100 mil comentários, doações e pagamentos | 5,3 s | 2,4 s |
+| Atualizações HOT na Doacao (10% das linhas) | 0% | 100% |
+| Atualizações HOT na Plataforma e na Conversao (recálculo completo) | 0% | 100% |
+| Atualizações HOT na Inscricao (mudança de nível) | 0% | 97% |
+| Índices da Doacao | 23 MB | 15 MB |
+| Dados do Comentario | 61 MB | 55 MB |
+
+As 12 consultas devolvem exatamente os mesmos resultados nas duas versões.
 
 ## Modelo
 
-São 20 tabelas. O caminho principal é:
+O caminho principal entre as 20 tabelas é:
 
 ```
 Plataforma -> Canal -> Video -> Comentario -> Doacao -> forma de pagamento
@@ -23,20 +72,20 @@ Plataforma -> Canal -> Video -> Comentario -> Doacao -> forma de pagamento
                  '-> NivelCanal -> Inscricao
 ```
 
-Usuário, canal, vídeo e doação têm identificador artificial, e a chave natural de cada um continua garantida por `UNIQUE`. A doação é gravada na moeda do país de quem doou e convertida para dólar nas visões. Cada comentário traz no máximo uma doação, paga de uma de quatro formas: cartão, PayPal, bitcoin ou o mecanismo da própria plataforma.
+Usuário, canal e vídeo têm identificador artificial, e a chave natural de cada um continua garantida por `UNIQUE`. A doação é identificada pela chave do comentário (vídeo, usuário, seq), e as quatro formas de pagamento (cartão, PayPal, bitcoin ou o mecanismo da própria plataforma) usam a chave da doação. O valor é gravado na moeda do país de quem doou e convertido para dólar nas visões.
 
 ## Estrutura
 
 | Arquivo | Conteúdo |
 |---|---|
-| `sql/1_tabelas.sql` | As 20 tabelas, com chaves, `UNIQUE`, `NOT NULL`, `CHECK` e chaves estrangeiras |
-| `sql/2_plsql.sql` | Triggers, visões (2 materializadas e 3 virtuais), os 5 índices de apoio, as 12 consultas como functions e as rotinas de manutenção |
+| `sql/1_tabelas.sql` | As 20 tabelas, com chaves, `UNIQUE`, `NOT NULL`, `CHECK`, chaves estrangeiras e `fillfactor` |
+| `sql/2_plsql.sql` | Visões (2 materializadas e 3 virtuais), os 5 índices de apoio, as 12 consultas como functions e as rotinas de manutenção |
 | `sql/3_dados.sql` | Carga de dados sintéticos |
-| `sql/4_consultas.sql` | Chamadas das 12 consultas, com e sem filtro, e um teste dos triggers de numeração |
+| `sql/4_consultas.sql` | Chamadas das 12 consultas, com e sem filtro |
 
 ## Como executar
 
-É preciso o PostgreSQL com o cliente `psql` (testado na versão 18). Crie um banco vazio e rode os quatro scripts, nesta ordem:
+É preciso ter o PostgreSQL com o cliente `psql` (testado na versão 18). Crie um banco vazio e rode os quatro scripts nesta ordem:
 
 ```bash
 createdb streamers
@@ -49,24 +98,20 @@ psql -d streamers -f 4_consultas.sql
 
 Se o servidor exigir usuário e senha, acrescente `-U usuario -h localhost` aos comandos.
 
-O `3_dados.sql` precisa ser executado pelo `psql`, sem a opção `-1` (`--single-transaction`): ele termina com um `VACUUM FULL`, que não roda dentro de transação nem em um script enviado de uma vez por uma ferramenta gráfica. Os outros três arquivos são SQL puro.
+O `3_dados.sql` precisa ser executado pelo `psql`, sem a opção `-1` (`--single-transaction`): ele termina com um `VACUUM FULL`, que não roda dentro de uma transação. A carga leva cerca de 1 minuto, e o `4_consultas.sql` cerca de 10 segundos, porque começa preenchendo as visões materializadas.
 
-A carga leva cerca de 1 minuto e o `4_consultas.sql` cerca de 10 segundos, porque começa preenchendo as visões materializadas. Os scripts também funcionam com a carga antes do `2_plsql.sql`.
-
-Para refazer tudo do zero (o `--force` encerra conexões abertas no banco):
+Para refazer tudo do zero (o `--force` encerra as conexões abertas no banco):
 
 ```bash
 dropdb --if-exists --force streamers
 createdb streamers
 ```
 
-## Volume
+## Dados
 
-Ao final do `3_dados.sql` é exibida a quantidade de linhas de cada tabela. Usuários, contas por plataforma, vídeos, comentários, inscrições e níveis de canal ficam com cerca de 800 mil linhas cada; canais, doações, patrocínios e participações ficam entre 170 mil e 360 mil; só países, moedas e plataformas ficam perto de mil. O banco ocupa cerca de 1,1 GB. Os dados são sorteados com semente fixa, então a carga é a mesma em toda execução.
+A carga é sintética, com semente fixa, então sai igual em toda execução. A distribuição é desigual, como numa plataforma real: poucos canais concentram a maior parte dos vídeos, comentários e doações. Usuários, contas por plataforma, vídeos, comentários, inscrições e níveis de canal ficam com cerca de 800 mil linhas cada. Canais, doações, patrocínios e participações ficam entre 170 mil e 360 mil. Países, moedas e plataformas ficam perto de mil. A quantidade de linhas de cada tabela é exibida ao final do `3_dados.sql`.
 
 ## Consultas
-
-Os filtros opcionais podem ser omitidos. Eles usam as chaves do modelo: número da plataforma, número da empresa, nick do usuário e nome do canal.
 
 | Nº | Função | Filtro opcional |
 |---|---|---|
@@ -85,7 +130,7 @@ Os filtros opcionais podem ser omitidos. Eles usam as chaves do modelo: número 
 
 Nas consultas 2 e 7, `p_plataforma` só é necessário quando existe canal com o mesmo nome em mais de uma plataforma, já que o canal é identificado por (nome, plataforma).
 
-As consultas 1 a 7 devolvem todas as linhas quando chamadas sem filtro (centenas de milhares neste volume), por isso os exemplos usam `LIMIT`. Os nicks e os nomes de canal são sorteados na carga; o `4_consultas.sql` guarda valores válidos numa tabela temporária `exemplo` e os usa nos filtros:
+Sem filtro, as consultas 1 a 7 devolvem centenas de milhares de linhas, por isso os exemplos usam `LIMIT`. O `4_consultas.sql` guarda valores válidos dos dados numa tabela temporária `exemplo` e os usa nos filtros:
 
 ```sql
 SELECT * FROM streamers_mais_videos() LIMIT 20;
@@ -94,13 +139,33 @@ SELECT * FROM canais_por_interacoes((SELECT streamer FROM exemplo));
 SELECT * FROM top_canais_faturamento(10);
 ```
 
+## Inserção
+
+Como o banco não tem triggers, duas regras ficam com a aplicação:
+
+- o `seq` do comentário é numerado por vídeo e usuário, e o `seq_plataforma` do mecanismo da plataforma também, entre as doações feitas por esse meio;
+- a doação e a sua forma de pagamento são inseridas na mesma transação, em uma única das quatro tabelas.
+
+```sql
+BEGIN;
+INSERT INTO Comentario (id_video, id_usuario, seq, dataH, coment_on, texto)
+VALUES (1, 1, 3, now(), TRUE, 'GG!');
+INSERT INTO Doacao (id_video, id_usuario, seq_comentario, valor, status)
+VALUES (1, 1, 3, 10, 'recebido');
+INSERT INTO PayPal (id_video, id_usuario, seq_comentario, IdPayPal)
+VALUES (1, 1, 3, 'PAYID-EXEMPLO');
+COMMIT;
+```
+
+O banco rejeita um `seq` repetido (chave primária), uma doação sem comentário e um pagamento sem doação (chaves estrangeiras).
+
 ## Manutenção
 
-As consultas 1 a 4 e 7 a 12 leem as visões materializadas; a 5 e a 6 são calculadas na hora, sobre os índices das chaves. Depois de inserir, alterar ou remover dados, atualize nesta ordem (o resumo por canal copia os contadores que a primeira função recalcula):
+As consultas 1 a 4 e 7 a 12 leem as visões materializadas. A 5 e a 6 são calculadas na hora, sobre os índices das chaves. Depois de inserir, alterar ou remover dados, atualize nesta ordem (o resumo por canal copia os contadores que a primeira função recalcula):
 
 ```sql
 SELECT recalcular_derivados();   -- qtd_users das plataformas, qtd_videos e qtd_visualizacoes dos canais
 SELECT atualizar_visoes();       -- visões materializadas, sem bloquear leituras
 ```
 
-O `REFRESH` desfaz aos poucos a ordem física que o `CLUSTER` deu às visões. Depois de muitas alterações, use `SELECT atualizar_visoes(TRUE);` no lugar da segunda linha: ela também refaz o `CLUSTER`, e bloqueia as visões enquanto roda.
+O `REFRESH` desfaz aos poucos a ordem física que o `CLUSTER` deu às visões. Depois de muitas alterações, use `SELECT atualizar_visoes(TRUE);` no lugar da segunda linha: ela também refaz o `CLUSTER`, mas bloqueia as visões enquanto roda.
