@@ -128,9 +128,9 @@ CREATE TABLE Inscricao (
         REFERENCES NivelCanal(id_canal, nivel) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
--- id_video no lugar da chave (canal, data, título); BIGINT porque a tabela cresce sem limite
+-- id_video no lugar da chave (canal, data, título); INTEGER chega a 2,1 bilhões de vídeos
 CREATE TABLE Video (
-    id_video BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id_video INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_canal INTEGER NOT NULL REFERENCES Canal(id_canal) ON DELETE CASCADE,
     titulo VARCHAR(200) NOT NULL,
     dataH TIMESTAMP NOT NULL,
@@ -145,14 +145,14 @@ CREATE TABLE Video (
 
 -- streamers que participam do vídeo além do dono do canal
 CREATE TABLE Participa (
-    id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
+    id_video INTEGER NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_streamer INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE CASCADE,
     PRIMARY KEY (id_video, id_streamer)
 );
 
 -- seq conta por vídeo e usuário e vem de quem insere; usuário que tem comentário não pode ser apagado
 CREATE TABLE Comentario (
-    id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
+    id_video INTEGER NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_usuario INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE RESTRICT,
     seq INTEGER NOT NULL,
     texto TEXT NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE Comentario (
 -- id_doacao evita repetir a chave do comentário nas formas de pagamento
 CREATE TABLE Doacao (
     id_doacao BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    id_video BIGINT NOT NULL,
+    id_video INTEGER NOT NULL,
     id_usuario INTEGER NOT NULL,
     seq_comentario INTEGER NOT NULL,
     valor NUMERIC(14,2) NOT NULL,
