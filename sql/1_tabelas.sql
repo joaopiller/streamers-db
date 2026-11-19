@@ -150,7 +150,7 @@ CREATE TABLE Participa (
     PRIMARY KEY (id_video, id_streamer)
 );
 
--- seq conta por vídeo e usuário; usuário que tem comentário não pode ser apagado
+-- seq conta por vídeo e usuário e vem de quem insere; usuário que tem comentário não pode ser apagado
 CREATE TABLE Comentario (
     id_video BIGINT NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_usuario INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE RESTRICT,

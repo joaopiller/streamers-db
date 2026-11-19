@@ -55,16 +55,3 @@ SELECT * FROM top_canais_faturamento(10);
 -- consulta 12: top k plataformas por streamers e canais; filtro por plataforma
 SELECT * FROM top_plataformas(10);
 SELECT * FROM top_plataformas(1, 2);
-
--- triggers: o seq do comentário e o da doação pela plataforma saem numerados (desfeito no ROLLBACK)
-BEGIN;
-INSERT INTO Comentario (id_video, id_usuario, texto, dataH, coment_on)
-VALUES (1, 1, 'primeiro', now(), TRUE) RETURNING seq;
-INSERT INTO Comentario (id_video, id_usuario, texto, dataH, coment_on)
-VALUES (1, 1, 'segundo', now(), TRUE) RETURNING seq;
-INSERT INTO Doacao (id_video, id_usuario, seq_comentario, valor, status)
-SELECT 1, 1, max(seq), 10, 'recebido' FROM Comentario WHERE id_video = 1 AND id_usuario = 1;
-INSERT INTO MecanismoPlat (id_doacao)
-SELECT max(id_doacao) FROM Doacao WHERE id_video = 1 AND id_usuario = 1
-RETURNING seq_plataforma;
-ROLLBACK;
