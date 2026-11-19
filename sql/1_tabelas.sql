@@ -9,12 +9,14 @@ DROP TABLE IF EXISTS MecanismoPlat, CartaoCredito, PayPal, BitCoin, Doacao,
                      Plataforma, EmpresaPais, Empresa, Pais, Conversao CASCADE;
 
 -- moedas e países
+-- a cotação de todas as moedas é atualizada de uma vez; com fillfactor 50 cada página tem espaço pra nova
+-- versão de todas as suas linhas, e a atualização não mexe no índice (HOT); a tabela é pequena, a folga custa pouco
 CREATE TABLE Conversao (
     moeda CHAR(3) PRIMARY KEY,
     nome VARCHAR(50) NOT NULL,
     fator_conver NUMERIC(18,8) NOT NULL,
     CONSTRAINT ck_conversao_fator CHECK (fator_conver > 0)
-);
+) WITH (fillfactor = 50);
 
 CREATE TABLE Pais (
     DDI INTEGER PRIMARY KEY,
@@ -37,7 +39,7 @@ CREATE TABLE EmpresaPais (
     CONSTRAINT uq_empresapais_idnacional UNIQUE (ddi_pais, id_nacional)
 );
 
--- qtd_users é derivado, atualizado pelo recalcular_derivados()
+-- qtd_users é derivado e o recalcular_derivados() atualiza todas as linhas; fillfactor 50 como na Conversao
 CREATE TABLE Plataforma (
     nro INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nome VARCHAR(100) NOT NULL UNIQUE,
@@ -46,7 +48,7 @@ CREATE TABLE Plataforma (
     empresa_respo INTEGER NOT NULL REFERENCES Empresa(nro),
     data_fund DATE NOT NULL,
     CONSTRAINT ck_plataforma_qtd_users CHECK (qtd_users >= 0)
-);
+) WITH (fillfactor = 50);
 
 -- id_usuario é artificial, o nick continua único
 CREATE TABLE Usuario (
@@ -119,6 +121,7 @@ CREATE TABLE NivelCanal (
 );
 
 -- membro vem primeiro na chave por causa da consulta 6, que filtra por usuário
+-- o membro sobe e desce de nível; nivel não está em índice desta tabela, então a atualização é HOT
 CREATE TABLE Inscricao (
     id_canal INTEGER NOT NULL,
     id_membro INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE CASCADE,
@@ -126,9 +129,10 @@ CREATE TABLE Inscricao (
     PRIMARY KEY (id_membro, id_canal),
     CONSTRAINT fk_inscricao_nivel FOREIGN KEY (id_canal, nivel)
         REFERENCES NivelCanal(id_canal, nivel) ON UPDATE CASCADE ON DELETE CASCADE
-);
+) WITH (fillfactor = 90);
 
 -- id_video no lugar da chave (canal, data, título); INTEGER chega a 2,1 bilhões de vídeos
+-- fillfactor 80 porque as visualizações são atualizadas durante e depois da live
 CREATE TABLE Video (
     id_video INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_canal INTEGER NOT NULL REFERENCES Canal(id_canal) ON DELETE CASCADE,
@@ -164,7 +168,7 @@ CREATE TABLE Comentario (
 );
 
 -- cada comentário traz no máximo uma doação, então a chave do comentário já identifica a doação
--- valor na moeda do país do doador
+-- valor na moeda do país do doador; o status muda (recebido -> lido) e não está em índice, por isso o fillfactor
 CREATE TABLE Doacao (
     id_video INTEGER NOT NULL,
     id_usuario INTEGER NOT NULL,
@@ -176,7 +180,7 @@ CREATE TABLE Doacao (
         REFERENCES Comentario(id_video, id_usuario, seq) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT ck_doacao_valor CHECK (valor > 0),
     CONSTRAINT ck_doacao_status CHECK (status IN ('recusado', 'recebido', 'lido'))
-);
+) WITH (fillfactor = 85);
 
 -- formas de pagamento: cada doação fica em uma destas quatro tabelas, inserida na mesma transação da doação
 CREATE TABLE BitCoin (
