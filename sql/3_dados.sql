@@ -324,9 +324,9 @@ WHERE s.nro_plataforma = p.nro;
 
 COMMIT;
 
-ANALYZE;
 -- tira as versões mortas que o UPDATE dos derivados deixou; precisa do psql, não roda dentro de transação
 VACUUM FULL Canal, Plataforma;
+ANALYZE;
 
 SELECT 'Conversao' AS tabela, count(*) AS tuplas FROM Conversao UNION ALL
 SELECT 'Pais', count(*) FROM Pais UNION ALL
