@@ -151,13 +151,14 @@ CREATE TABLE Participa (
 );
 
 -- seq conta por vídeo e usuário e vem de quem insere; usuário que tem comentário não pode ser apagado
+-- colunas de tamanho fixo antes do texto, pra não sobrar espaço de alinhamento na linha
 CREATE TABLE Comentario (
     id_video INTEGER NOT NULL REFERENCES Video(id_video) ON DELETE CASCADE,
     id_usuario INTEGER NOT NULL REFERENCES Usuario(id_usuario) ON DELETE RESTRICT,
     seq INTEGER NOT NULL,
-    texto TEXT NOT NULL,
     dataH TIMESTAMP NOT NULL,
     coment_on BOOLEAN NOT NULL,
+    texto TEXT NOT NULL,
     PRIMARY KEY (id_video, id_usuario, seq),
     CONSTRAINT ck_comentario_seq CHECK (seq > 0)
 );
@@ -202,9 +203,9 @@ CREATE TABLE CartaoCredito (
     id_video INTEGER NOT NULL,
     id_usuario INTEGER NOT NULL,
     seq_comentario INTEGER NOT NULL,
+    dataH TIMESTAMP NOT NULL,
     nro VARCHAR(25) NOT NULL,
     bandeira VARCHAR(30) NOT NULL,
-    dataH TIMESTAMP NOT NULL,
     PRIMARY KEY (id_video, id_usuario, seq_comentario),
     CONSTRAINT fk_cartao_doacao FOREIGN KEY (id_video, id_usuario, seq_comentario)
         REFERENCES Doacao(id_video, id_usuario, seq_comentario) ON UPDATE CASCADE ON DELETE CASCADE
