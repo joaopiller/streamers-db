@@ -60,6 +60,10 @@ Comparação com a versão anterior do projeto, que usava triggers e chaves `BIG
 
 As 12 consultas devolvem exatamente os mesmos resultados nas duas versões.
 
+### Uso de IA
+
+O banco foi criado com o apoio do Claude (Anthropic). As decisões de otimização se basearam em testes que ele executou: comparação de tempo de inserção com e sem triggers, medição da proporção de atualizações HOT para cada `fillfactor` e tamanho de tabelas e índices com cada tipo de chave. Os números da tabela acima vêm desses testes.
+
 ## Modelo
 
 O caminho principal entre as 20 tabelas é:
